@@ -12,19 +12,6 @@ MainWindow::MainWindow(QWidget *parent)
     showCalendar = false;
     calendar = new CalendarWidget(this);
     ui->verticalLayout->addWidget(calendar);
-    QFile file("date.txt");
-    file.open(QIODevice::ReadOnly | QIODevice::Text);
-    QTextStream out(&file);
-    QString list = out.readAll();
-    date = list.split("\n");
-    file.close();
-    qDebug()<<date.size();
-    calendar->setDays(date);
-    calendar->setMinimumWidth(500);
-    qDebug()<< "文件大小"<< list.size();
-
-
-//    calendar->setMaxDate(QDate::currentDate());
 }
 
 MainWindow::~MainWindow()

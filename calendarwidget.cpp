@@ -1,13 +1,22 @@
 #include "calendarwidget.h"
-#include <QDebug>
-#include <time.h>
 
-DateIconButton::DateIconButton(QWidget *parent):
+#include "calendarwidget.h"
+
+DateIconButton::DateIconButton(BtnType btnTy,QWidget *parent):
     QAbstractButton(parent)
 {
     type = DayType::normal;
     prevType = DayType::normal;
     setTabletTracking(true);
+    currentBtn = btnTy;
+    if(currentBtn == BtnType::DayBtn){
+        selectedSize = QSize(24,24);
+    }
+    else if(currentBtn == BtnType::MonthBtn){
+        selectedSize = QSize(37,25);
+    }else if(currentBtn == BtnType::YearBtn){
+        selectedSize = QSize(54,25);
+    }
 }
 
 void DateIconButton::setEnabled(bool value)
@@ -30,70 +39,55 @@ void DateIconButton::setType(DateIconButton::DayType t,bool enable)
 
 DateIconButton::~DateIconButton()
 {
-    qDebug()<<"DateIconButton析构函数";
 }
 
 void DateIconButton::paintEvent(QPaintEvent *e)
 {
     Q_UNUSED(e);
     QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing,true);
     switch (type)
     {
     case normal:
     {
-        drawText(&painter,Qt::black);
+        drawText(&painter,QColor(__NORMALCOLOR));
     }break;
     case weekend:
     {
-        drawText(&painter,Qt::red);
+        drawText(&painter,QColor(__WEEKENCOLOR));
     }break;
     case notworking:
     {
-        QPen pen(Qt::black);
+        double halfWidth = double(selectedSize.width()/2.0) - 4;
+        double halfHeight = double(selectedSize.height()/2.0) - 4;
+        QPen pen(QColor(__NOTWORKINGBACKGROUND));
         pen.setWidth(3);
         painter.setPen(pen);
-        //30 20
-        painter.drawLine(width()/2 -15,height()/2-10,width()/2 + 15,height()/2 +10);
-        painter.drawLine(width()/2 -15,height()/2 + 10,width()/2 + 15,height()/2 -10);
-        drawText(&painter,Qt::gray);
+        //绘制 X
+        painter.drawLine(width()/2.0 -halfWidth,height()/2.0-halfHeight,width()/2.0 + halfWidth,height()/2.0 +halfHeight);
+        painter.drawLine(width()/2.0 -halfWidth,height()/2.0 + halfHeight,width()/2.0 + halfWidth,height()/2.0 -halfHeight);
+        drawText(&painter,QColor(__NOTWORKINGCOLOR));
     }break;
     case notenable:
     {
-        drawText(&painter,Qt::gray);
+        drawText(&painter,QColor(__NOTENABLECOLOR));
     }break;
     case selected:
     {
-        int whiteBorderW = 4;
-        QPen pen(Qt::blue);
-        pen.setWidth(whiteBorderW);
-        painter.setPen(pen);
-        QBrush brush(Qt::white);
+        QBrush brush(QColor(__SELECTEDBACKGROUND));
+        painter.setPen(QColor(__SELECTEDBACKGROUND));
         painter.setBrush(brush);
-        painter.drawRect(0,0,width(),height());
-
-        brush.setColor(Qt::blue);
-        painter.setBrush(brush);
-        pen.setWidth(0);
-        painter.setPen(pen);
-        painter.drawRect(2*whiteBorderW,2*whiteBorderW,width()-4*whiteBorderW,height()-4*whiteBorderW);
-        drawText(&painter,Qt::white);
+        painter.drawRoundedRect(QRectF( width()/2.0 - (double)selectedSize.width()/2.0,height()/2.0-selectedSize.height()/2.0,selectedSize.width(),selectedSize.height()),4,4);
+        drawText(&painter,QColor(__SELECTEDCOLOR));
     }break;
     case hover:
     {
-        int whiteBorderW = 4;
-        QPen pen("#666666");
-        pen.setWidth(whiteBorderW);
-        painter.setPen(pen);
-        QBrush brush(Qt::white);
+        QColor _col(__HOVERBACKGROUND);
+        QBrush brush(QColor(_col.red(),_col.green(),_col.blue(),80));
+        painter.setPen(QColor(_col.red(),_col.green(),_col.blue(),80));
         painter.setBrush(brush);
-        painter.drawRect(0,0,width(),height());
-
-        brush.setColor("#666666");
-        painter.setBrush(brush);
-        pen.setWidth(0);
-        painter.setPen(pen);
-        painter.drawRect(2*whiteBorderW,2*whiteBorderW,width()-4*whiteBorderW,height()-4*whiteBorderW);
-        drawText(&painter,Qt::white);
+        painter.drawRoundedRect(width()/2.0 - (double)selectedSize.width()/2.0,height()/2.0-selectedSize.height()/2.0,selectedSize.width(),selectedSize.height(),4,4);
+        drawText(&painter,QColor(__HOVERCOLOR));
     }break;
     default:
         break;
@@ -103,6 +97,8 @@ void DateIconButton::paintEvent(QPaintEvent *e)
 void DateIconButton::enterEvent(QEvent *event)
 {
     Q_UNUSED(event);
+    if(type == notenable || type == notworking)
+        return;
     prevType = type;
     type = hover;
 }
@@ -110,6 +106,8 @@ void DateIconButton::enterEvent(QEvent *event)
 void DateIconButton::leaveEvent(QEvent *event)
 {
     Q_UNUSED(event);
+    if(type == notenable || type == notworking)
+        return;
     type = prevType;
 }
 
@@ -133,16 +131,17 @@ CalendarWidget::CalendarWidget(QWidget *parent):
     month = date.month();
     day = date.day();
     openDays = false;
-    minDate = QDate(1970,1,1);
-    maxDate = QDate(2050,1,1);
+    minDate = QDate(1900,1,1);
+    maxDate = QDate(2080,1,1);
     weekHeight = 40;
-    titleHeight = 50;
+    titleHeight = 40;
     initStackedWidget();
     type = TitleType::DayType;
     stackedWidget->setCurrentIndex((int)TitleType::DayType);
     initTitle();
     initWeek();
     this->setMinimumSize(minWidth,minHeight);
+    this->setMaximumSize(minWidth,minHeight);
 }
 
 CalendarWidget::~CalendarWidget()
@@ -153,38 +152,16 @@ CalendarWidget::~CalendarWidget()
 void CalendarWidget::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
+    QPen pen(__CALENDARBORDER);
+    pen.setWidth(margin);
     QPainter painter(this);
-    painter.setPen(Qt::white);
-    painter.setBrush(Qt::white);
-    painter.drawRect(rect());
-}
+    painter.setPen(pen);
+    painter.setBrush(QColor(__CALENDARBACKGROUND));
+    painter.drawRect(0,0,width() - 2*margin ,height() -margin);
 
-void CalendarWidget::setDays(QList<QString> list)
-{
-    if(list.size() == 0)
-        return;
-    QString sMax = list.first();
-    if(!sMax.isEmpty()){
-        QStringList vList = sMax.split("-");
-        if(vList.size() >=3)
-            maxDate.setDate(vList.at(0).toInt(),vList.at(1).toInt(),vList.at(2).toInt());
-    }
-
-    QString sMin = list.last();
-    while(sMin.isEmpty()){
-        list.pop_back();
-        sMin = list.last();
-    }
-    QStringList vList = sMin.split("-");
-    if(vList.size() >=3)
-        minDate.setDate(vList.at(0).toInt(),vList.at(1).toInt(),vList.at(2).toInt());
-
-    openDays = true;
-    days.clear();
-    foreach(QString key, list)
-    {
-        days.insert(key);
-    }
+    painter.setBrush(QColor(__CALENDARMARGIN));
+    painter.setPen(QColor(__CALENDARMARGIN));
+    painter.drawRect(0,titleHeight,width() - 2*margin ,titleSpace);
 }
 
 void CalendarWidget::resizeEvent(QResizeEvent *event)
@@ -207,15 +184,22 @@ void CalendarWidget::wheelEvent(QWheelEvent *event)
     }
 }
 
+void CalendarWidget::showEvent(QShowEvent *event)
+{
+    Q_UNUSED(event);
+    resizeDays();
+}
+
 QWidget *CalendarWidget::_getYearWidet()
 {
     if(yearWidget != nullptr)
         return yearWidget;
 
     yearWidget = new QWidget( this);
+    yearWidget->setStyleSheet(__YEARWIDGETSTYLE);
     for(int i = 0; i < 12; i++)
     {
-        DateIconButton *btn = new DateIconButton(yearWidget);
+        DateIconButton *btn = new DateIconButton(DateIconButton::YearBtn,yearWidget);
         connect(btn,SIGNAL(clicked()),this,SLOT(yearClick()));
         btn->setText(QString::number(i + year - YearBeginCount));
         btn->hide();
@@ -230,11 +214,12 @@ QWidget *CalendarWidget::_getMonthWidget()
         return monthWidget;
 
     monthWidget = new QWidget( this);
+    monthWidget->setStyleSheet(__MONTHWIDGETSTYLE);
     for(int i = 0; i < 12; i++)
     {
-        DateIconButton *btn = new DateIconButton(monthWidget);
+        DateIconButton *btn = new DateIconButton(DateIconButton::MonthBtn,monthWidget);
         connect(btn,SIGNAL(clicked()),this,SLOT(monthClick()));
-        btn->setText(QString::number(i+1));
+        btn->setText(QString::asprintf("%d月",i+1));
         btn->hide();
         monthList.append(btn);
     }
@@ -247,11 +232,12 @@ QWidget *CalendarWidget::_getDayWidget()
         return dayWideget;
 
     dayWideget = new QWidget(this);
+    dayWideget->setStyleSheet(__DAYWIDGETSTYLE);
     for(int i = 0; i < WeekCount; i++)
     {
         for(int j = 0; j < RowCount; j++)
         {
-            DateIconButton *btn = new DateIconButton(dayWideget);
+            DateIconButton *btn = new DateIconButton(DateIconButton::DayBtn,dayWideget);
             connect(btn,SIGNAL(clicked()),this,SLOT(daysClick()));
             btn->hide();
             calendarList.append(btn);
@@ -280,9 +266,15 @@ void CalendarWidget::initWeek()
 {
     QStringList weeks;
     weeks<< "一"<<"二"<<"三"<<"四"<<"五"<<"六"<<"日";
+    int i=0;
     foreach(QString week, weeks)
     {
         QLabel *label = new QLabel(week,dayWideget);
+        label->setStyleSheet(__WEEKWIDGETSTYLE);
+        if(i == 5 || i== 6){
+            label->setStyleSheet(QString::asprintf("color:%s",__WEEKENCOLOR));
+        }
+        i++;
         label->setAlignment(Qt::AlignCenter);
         label->hide();
         weekList.append(label);
@@ -306,11 +298,11 @@ void CalendarWidget::initStackedWidget()
 
 void CalendarWidget::resizeTitle()
 {
-    int btnWidth = 166;
-    int btnHeight = 21;
-    prevBtn->setGeometry(20, 10, 21,21);
-    nextBtn->setGeometry(width()-20-21,10,21,21);
-    titleBtn->setGeometry(width()/2 - btnWidth/2, 10,btnWidth,btnHeight);
+    int btnWidth = 120;
+    int btnHeight = 22;
+    prevBtn->setGeometry(20, 15, 10,10);
+    nextBtn->setGeometry(width()-20-21,15,10,10);
+    titleBtn->setGeometry(width()/2 - btnWidth/2, titleHeight/2 - btnHeight/2,btnWidth,btnHeight);
 }
 
 void CalendarWidget::resizeWeek()
@@ -320,7 +312,7 @@ void CalendarWidget::resizeWeek()
     for(int i = 0;i < weekList.size(); i++)
     {
         label = weekList.at(i);
-        label->setGeometry(i*oneWidth , 0, oneWidth , 30);
+        label->setGeometry(i*oneWidth , 0, oneWidth , titleHeight);
         label->show();
     }
 }
@@ -328,7 +320,7 @@ void CalendarWidget::resizeWeek()
 void CalendarWidget::resizeStackedWidget()
 {
     int beginY = titleHeight;
-    stackedWidget->setGeometry(0,beginY,width(),height()-beginY);
+    stackedWidget->setGeometry(margin,beginY+titleSpace,width()-3*margin,height()-beginY-margin);
 }
 
 void CalendarWidget::resizeDays()
@@ -338,7 +330,6 @@ void CalendarWidget::resizeDays()
     tDate = tDate.addDays(1 - week);
     double oneHeight = (double)(dayWideget->height() - weekHeight)/RowCount;
     double oneWidth = (double)dayWideget->width() /(double)WeekCount;
-    QString year_mstr = "";
     DateIconButton *btn = nullptr;
     for(int j = 0; j < RowCount; j++)
     {
@@ -372,14 +363,8 @@ void CalendarWidget::resizeDays()
                 btn->setType(DateIconButton::selected);
             }
 
-            year_mstr = QString::asprintf("%d-%02d-",tDate.year(),tDate.month());
-            bool result = days.contains(year_mstr + QString::asprintf("%02d",tDate.day()));
-            if(!result && openDays)
-                btn->setType(DateIconButton::notworking,false);
-
-
             tDate = tDate.addDays(1);
-            btn->setGeometry(i * oneWidth,weekHeight + j * oneHeight ,oneWidth, oneHeight);
+            btn->setGeometry(i * oneWidth ,weekHeight + j * oneHeight ,oneWidth, oneHeight);
         }
     }
     setTitleBtnText();
@@ -387,8 +372,10 @@ void CalendarWidget::resizeDays()
 
 void CalendarWidget::resizeMonth()
 {
-    double oneHeight = stackedWidget->height()/3;
-    double oneWidth = stackedWidget->width()/4;
+    int monthRow = 4;
+    int monthCol = 3;
+    double oneHeight = stackedWidget->height()/monthRow;
+    double oneWidth = stackedWidget->width()/monthCol;
 
     DateIconButton *btn = nullptr;
     for(int i = 0;i < monthList.size(); i++)
@@ -402,16 +389,22 @@ void CalendarWidget::resizeMonth()
         }
         else{
             btn->setEnabled(true);
+            if(month == (i+1)){
+                btn->setType(DateIconButton::selected);
+            }else
+                btn->setType(DateIconButton::normal);
         }
-        monthList.at(i)->setGeometry((i%4)*oneWidth,(i/4)*oneHeight,oneWidth,oneHeight);
+        monthList.at(i)->setGeometry((i%monthCol)*oneWidth,(i/monthCol)*oneHeight,oneWidth,oneHeight);
         monthList.at(i)->show();
     }
 }
 
 void CalendarWidget::resizeYear()
 {
-    double oneHeight = stackedWidget->height()/3;
-    double oneWidth = stackedWidget->width()/4;
+    int yearRow = 4;
+    int yearCol = 3;
+    double oneHeight = stackedWidget->height()/yearRow;
+    double oneWidth = stackedWidget->width()/yearCol;
 
     int beginYear = year - YearBeginCount;
     if(beginYear < minDate.year())
@@ -419,8 +412,8 @@ void CalendarWidget::resizeYear()
 
     for(int i = 0; i < yearList.size(); i++)
     {
-        yearList.at(i)->setGeometry((i%4)*oneWidth,(i/4)*oneHeight,oneWidth,oneHeight);
-        yearList.at(i)->setText(QString::number(i + beginYear));
+        yearList.at(i)->setGeometry((i%yearCol)*oneWidth,(i/yearCol)*oneHeight,oneWidth,oneHeight);
+        yearList.at(i)->setText(QString::asprintf("%d年",i+beginYear));
         if(i + beginYear > maxDate.year())
         {
             yearList.at(i)->hide();
@@ -429,6 +422,10 @@ void CalendarWidget::resizeYear()
         {
             yearList.at(i)->show();
             yearList.at(i)->setEnabled(true);
+            if(year == i+beginYear)
+                yearList.at(i)->setType(DateIconButton::selected);
+            else
+                yearList.at(i)->setType(DateIconButton::normal);
         }
 
     }
@@ -440,17 +437,21 @@ void CalendarWidget::setTitleBtnText()
     {
     case TitleType::DayType:
     {
-        titleBtn->setText(QString::asprintf("%d年%d月%d日",year,month,day));
+        titleBtn->setText(QString::asprintf("%d年%d月",year,month,day));
     }break;
     case TitleType::MonthType:
     {
-        titleBtn->setText(QString::asprintf("%d年%d月",year,month));
+        titleBtn->setText(QString::asprintf("%d年",year,month));
     }break;
     case TitleType::YearType:
     {
         int minYear = qMax<int>(year - YearBeginCount,minDate.year());
         int maxYear = qMin<int> (year + 11 - YearBeginCount,maxDate.year());
-        titleBtn->setText(QString::asprintf("%d -- %d",minYear,maxYear));
+        if(minYear == minDate.year()){
+            maxYear = qMin<int>(year + 11,maxDate.year());
+        }
+
+        titleBtn->setText(QString::asprintf("%d年 - %d年",minYear,maxYear));
     }break;
     default:
         break;
@@ -561,7 +562,8 @@ void CalendarWidget::nextClick()
 void CalendarWidget::monthClick()
 {
     DateIconButton *btn = static_cast<DateIconButton *>(sender());
-    month = btn->text().toInt();
+    QString text = btn->text();
+    month = text.left(text.length()-1).toInt();
     resizeDays();
     type = TitleType::DayType;
     stackedWidget->setCurrentIndex(int(type));
@@ -571,7 +573,8 @@ void CalendarWidget::monthClick()
 void CalendarWidget::yearClick()
 {
     DateIconButton *btn = static_cast<DateIconButton *>(sender());
-    year = btn->text().toInt();
+    QString text = btn->text();
+    year = text.left(text.length()-1).toInt();
     resizeMonth();
     type = TitleType::MonthType;
     stackedWidget->setCurrentIndex(int(type));
@@ -582,9 +585,9 @@ void CalendarWidget::daysClick()
 {
     DateIconButton *btn = static_cast<DateIconButton *>(sender());
     day = btn->text().toInt();
+    date = QDate(year,month,day);
     setTitleBtnText();
-    emit clicked(QDate(year,month,day));
-    qDebug()<<year<<"年"<<month<<"月"<<day<<"日";
+    emit clicked(date);
 }
 
 TitleButton::TitleButton(QWidget *parent)
@@ -611,7 +614,7 @@ void TitleButton::paintEvent(QPaintEvent *e)
     switch (type) {
     case DrawRightIcon:
     {
-        pen.setColor(Qt::black);
+        pen.setColor(Qt::white);
         pen.setWidth(2);
         painter.setPen(pen);
         QPoint mid(width(),height()/2);
@@ -620,7 +623,7 @@ void TitleButton::paintEvent(QPaintEvent *e)
     }break;
     case DrawLeftIcon:
     {
-        pen.setColor(Qt::black);
+        pen.setColor(Qt::white);
         pen.setWidth(2);
         painter.setPen(pen);
         QPoint mid(0,height()/2);
@@ -629,7 +632,9 @@ void TitleButton::paintEvent(QPaintEvent *e)
     }break;
     case DrawText:
     {
-        painter.drawText(0,0,width(),height(),Qt::AlignVCenter,text());
+        pen.setColor(Qt::white);
+        painter.setPen(pen);
+        painter.drawText(0,0,width(),height(),Qt::AlignCenter,text());
     }break;
     default:
         break;
@@ -644,5 +649,4 @@ void TitleButton::setType(TitleButton::DrawType ty)
 
 TitleButton::~TitleButton()
 {
-    qDebug()<<"TitleButton析构函数";
 }

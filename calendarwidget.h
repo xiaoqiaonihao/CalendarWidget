@@ -7,12 +7,31 @@
 #include <QPushButton>
 #include <QAbstractButton>
 #include <QStackedWidget>
-#include <QSet>
 #include <QObject>
 #include <QLabel>
 #include <QFont>
 #include <QPainter>
 #include <QMouseEvent>
+
+#define __WEEKWIDGETSTYLE           "color:#D3D8DF;"                   //星期的颜色
+#define __DAYWIDGETSTYLE            "background-color:#1C1F28;"        //日期的背景颜色
+#define __MONTHWIDGETSTYLE          "background-color:#1C1F28;"        //1-12 月的背景颜色
+#define __YEARWIDGETSTYLE           "background-color:#1C1F28;"        //年份的背景颜色
+#define __CALENDARBACKGROUND        "#1C1F28"                          //日历背景色
+#define __CALENDARBORDER            "#000000"                          //日历borer
+#define __CALENDARMARGIN            "#000000"                          //分割线颜色
+#define __HOVERBACKGROUND           "#0096FF"                          //悬浮背景颜色
+#define __HOVERCOLOR                "#D3D8DF"                          //悬浮文字颜色
+#define __SELECTEDBACKGROUND        "#0096FF"                          //选中背景颜色
+#define __SELECTEDCOLOR             "#D3D8DF"                          //选中文字颜色
+#define __NORMALCOLOR               "#D3D8DF"                          //正常文字颜色
+#define __WEEKENCOLOR               "#FF0000"                          //周末文字颜色
+#define __NOTWORKINGBACKGROUND      "#555550"                          //非工作日背景颜色
+#define __NOTWORKINGCOLOR           "#D3D8DF"                          //非工作日文字颜色
+#define __NOTENABLECOLOR            "#6B737D"                          //非本月日期文字颜色
+
+
+
 
 class DateIconButton : public QAbstractButton
 {
@@ -26,7 +45,13 @@ public:
         selected,
         hover,
     };
-    explicit DateIconButton(QWidget *parent = nullptr);
+
+    enum BtnType{
+        DayBtn,
+        MonthBtn,
+        YearBtn
+    };
+    explicit DateIconButton(BtnType btnTy,QWidget *parent = nullptr);
     void setEnabled(bool value);
     void setType(DayType t,bool enable = true);
     ~DateIconButton();
@@ -34,6 +59,10 @@ public:
 private:
     DayType type;
     DayType prevType;
+    BtnType currentBtn;
+    QSize selectedSize;
+
+
 
 protected:
     void paintEvent(QPaintEvent *e);
@@ -69,14 +98,16 @@ public:
     explicit CalendarWidget(QWidget *parent = nullptr);
     ~CalendarWidget();
     QDate getDate(){return date;}
-    void paintEvent(QPaintEvent *event);
-    void setMinDate(QDate date){minDate = date; }
-    void setMaxDate(QDate date){maxDate = date; }
-    void setDays(QList<QString> list);
+    void setMinimumDate(QDate date){minDate = date; }
+    void setMaximumDate(QDate date){maxDate = date; }
+    void setSelectedDate(QDate tDate){date = tDate;}
+    QDate selectedDate(){return date;}
 
 protected:
     void resizeEvent(QResizeEvent *event);
+    void paintEvent(QPaintEvent *event);
     void wheelEvent(QWheelEvent * event);
+    void showEvent(QShowEvent *event);
 
 private:
     enum TitleType{
@@ -85,14 +116,16 @@ private:
         YearType
     };
 
-    QSet<QString> days;
+    const int WeekCount = 7;
+    const int RowCount = 6;
+    const int minWidth = 260;
+    const int minHeight = 260;
+    const int margin = 2;
+    const int titleSpace = 2;
+
     QDate date;
     QDate maxDate;
     QDate minDate;
-    const int WeekCount = 7;
-    const int RowCount = 6;
-    const int minWidth = 150;
-    const int minHeight = 150;
     QList <DateIconButton *> calendarList;
     QList <DateIconButton *> monthList;
     QList <DateIconButton *> yearList;
@@ -144,4 +177,5 @@ signals:
 
 };
 
-#endif // MYCALENDARWIDGET_H
+
+#endif // CALENDARWIDGET_H
